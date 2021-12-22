@@ -3,11 +3,15 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord)
     vec2 uv = fragCoord/iResolution.xy;
     
     
-    vec3 bg_col = vec3(.3, .6, .7);
+    vec3 bg_col = vec3(.0, .0, .0);
     
     vec3 col_col = vec3(0.8, .1, .91);
     
     int cols = 25;
+    
+    vec3 b_col = vec3(0.878,0.373,0.102);
+    vec3 e_col = vec3(0.337,0.882,0.675);
+    col_col = mix(b_col, e_col, uv.x);
     
     uv.x *= float(cols);
  
