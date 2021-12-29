@@ -1,0 +1,44 @@
+vec4 Circle(in vec2 uv, in vec2 p0, in float r, in float blur)
+{
+    float d = length(uv-p0);
+    vec4 col = vec4(.0);
+    col.a = 1.0-smoothstep(r-blur, r+blur, d);
+    return vec4(1.0)*col.a;
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    // Normalized pixel coordinates (from 0 to 1)
+    vec2 uv = fragCoord/iResolution.xy;
+    uv-=0.5;
+    uv.x*=iResolution.x/iResolution.y;
+    // Time varying pixel color
+    float t = iTime;
+    float x = -.8;
+    float y = 0.0;
+    vec2 p0 = vec2(x, y);
+    vec4 col1 = vec4(0.0);
+    vec4 col2 = vec4(.0);
+    
+    vec2 xy[9];
+    xy[0]= vec2(-0.8, 0.37);
+    xy[1]= vec2(-0.6, 0.13);
+    xy[2]= vec2(-0.4, 0.82);
+    xy[3]= vec2(-0.2, 0.45);
+    xy[4]= vec2(0.0, 0.0);
+    xy[5]= vec2(0.2, 0.91);
+    xy[6]= vec2(0.4, 0.27);
+    xy[7]= vec2(0.6, 0.19);
+    xy[8]= vec2(0.8, 0.64);
+    for(int i=0;i<9;i++)
+    {
+        x = xy[i].x;
+        y = 0.5-fract(t+xy[i].y);
+        p0 = vec2(x, y);
+        col1 += Circle(uv, p0, 0.07, 0.01);
+    }
+    vec3 col = mix(col1.rgb, col2.rgb, -col1.a);
+    
+    // Output to screen
+    fragColor = vec4(col.rgb,1.0);
+}

@@ -1,0 +1,139 @@
+#define gblur 0.001
+float cro(in vec2 a, in vec2 b ) { return a.x*b.y - a.y*b.x; }
+
+vec4 Circle(in vec2 uv, in vec2 p0, in float r, in float blur)
+{
+    float d = length(uv-p0);
+    vec4 col = vec4(.0);
+    col.a = 1.0-smoothstep(r-blur, r+blur, d);
+    return vec4(1.0)*col.a;
+}
+
+vec4 Triangle( in vec2 p, in vec2 p0, in vec2 p1, in vec2 p2 )
+{
+    vec2 e0 = p1-p0, e1 = p2-p1, e2 = p0-p2;
+    vec2 v0 = p -p0, v1 = p -p1, v2 = p -p2;
+    vec2 pq0 = v0 - e0*clamp( dot(v0,e0)/dot(e0,e0), 0.0, 1.0 );
+    vec2 pq1 = v1 - e1*clamp( dot(v1,e1)/dot(e1,e1), 0.0, 1.0 );
+    vec2 pq2 = v2 - e2*clamp( dot(v2,e2)/dot(e2,e2), 0.0, 1.0 );
+    float s = sign( e0.x*e2.y - e0.y*e2.x );
+    vec2 d = min(min(vec2(dot(pq0,pq0), s*(v0.x*e0.y-v0.y*e0.x)),
+                     vec2(dot(pq1,pq1), s*(v1.x*e1.y-v1.y*e1.x))),
+                     vec2(dot(pq2,pq2), s*(v2.x*e2.y-v2.y*e2.x)));
+    float rd = -sqrt(d.x)*sign(d.y);            
+    vec4 col = vec4(.0);
+    col.a = 1.0-smoothstep(.0-gblur, .0+gblur, rd);
+    return vec4(1.0)*col.a;
+}
+
+vec4 UnevenCapsuleY( in vec2 p, in float ra, in float rb, in float h )
+{
+    p.x = abs(p.x); // 左右对称
+    float cos_h = (ra-rb)/h;
+    float sin_h = sqrt(1.0-cos_h*cos_h);
+    // c是垂直于直线边的单位向量，直线边单位向量为(-cos_h, sin_h)
+    vec2  c = vec2(sin_h, cos_h);
+    // 所谓cro其实可以看成先将b逆时针旋转90°，然后再计算a和b的点乘
+    // 胶囊的sdf计算同样分为三部分，上半圆+直线边+下半圆， 方法是将op向量投影到直线边上
+    // 所以k就表示op投影到直线边上，可以用来判断p点处于哪块区域
+    float k = cro(c,p);
+    // m表示op投影到直线边逆时针旋转了90°的向量上，可用来计算p点与下圆圆心之间的距离
+    float m = dot(c,p);
+    // op长度的平方
+    float n = dot(p,p);
+
+    float d = .0;
+    if( k < 0.0)    d = sqrt(n)- ra;  // 位于下圆部分
+     // 上圆，这里用到了余弦定理，h表示两圆心的长度，以及op和p点到上半圆的连线组成一个三角形，sqrt(n)*cos(op与y轴夹角)=p.y （因为h在y轴上）
+    else if( k > c.x*h )    d = sqrt(n+h*h-2.0*h*p.y)- rb;
+    // 减去ra
+    else    d = m - ra;
+
+    vec4 col = vec4(.0);
+    col.a = 1.0-smoothstep(.0-gblur, .0+gblur, d);
+    return vec4(1.0)*col.a;
+}
+
+vec4 Rect(in vec2 p, in vec2 p0, in float w, in float h)
+{
+    p = p-p0;
+    vec2 b = vec2(w/2.0, h/2.0);
+    vec2 d = abs(p)-b;
+    float rd = length(max(d,0.0)) + min(max(d.x,d.y),0.0);
+
+    vec4 col = vec4(.0);
+    col.a = 1.0-smoothstep(.0-gblur, .0+gblur, rd);
+    return vec4(1.0)*col.a;
+}
+
+vec4 Background( in vec2 uv )
+{
+    // Normalized pixel coordinates (from 0 to 1)
+    uv-=0.5;
+    uv.x*=iResolution.x/iResolution.y;
+    // Time varying pixel color
+    float t = iTime;
+    float x = -.8;
+    float y = 0.0;
+    vec2 p0 = vec2(x, y);
+    vec4 col1 = vec4(0.0);
+    vec4 col2 = vec4(.0);
+    
+    vec2 xy[9];
+    xy[0]= vec2(-0.8, 0.37);
+    xy[1]= vec2(-0.6, 0.13);
+    xy[2]= vec2(-0.4, 0.82);
+    xy[3]= vec2(-0.2, 0.45);
+    xy[4]= vec2(0.0, 0.0);
+    xy[5]= vec2(0.2, 0.91);
+    xy[6]= vec2(0.4, 0.27);
+    xy[7]= vec2(0.6, 0.19);
+    xy[8]= vec2(0.8, 0.64);
+    for(int i=0;i<9;i++)
+    {
+        x = xy[i].x;
+        y = 0.5-fract(t+xy[i].y);
+        p0 = vec2(x, y);
+        col1 += Circle(uv, p0, 0.07, 0.01);
+    }
+    vec4 col = mix(col1, col2, -col1.a);
+    
+    // Output to screen
+    return col;
+}
+
+vec4 DrawPlane(in vec2 uv)
+{
+	uv *= 2.0;
+    uv -= 1.0;
+    uv.x *= iResolution.x/iResolution.y;
+    vec2 p = uv;
+    
+    float y_off = -0.3;
+	vec4 col = vec4(.0);
+    vec4 t1 = Triangle(p, vec2(0.0, 0.38+y_off), vec2(-0.4, 0.3+y_off), vec2(0.4, 0.3+y_off));
+    col = mix(t1, col, 1.-t1.a);
+    vec4 b1 = Rect(p, vec2(0.0, 0.26+y_off), 0.8, 0.08);
+    col = mix(b1, col, 1.-b1.a);
+    vec4 t2 = Triangle(p, vec2(0.0, -0.37+y_off), vec2(-0.2, -0.42+y_off), vec2(0.2, -0.42+y_off));
+    col = mix(t2, col, 1.-t2.a);
+    vec4 b2 = Rect(p, vec2(0.0, -0.46+y_off), 0.4, 0.08);
+    col = mix(b2, col, 1.-b2.a);
+    vec2 p2 = p;
+    p2.y += 0.5-y_off;  
+    vec4 u1 = UnevenCapsuleY(p2, 0.05, 0.1, 1.0);
+    col = mix(u1, col, 1.-u1.a);
+    return col;
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    // Normalized pixel coordinates (from 0 to 1)
+    vec2 uv = fragCoord/iResolution.xy;
+    
+	vec4 col = Background(uv);
+	vec4 col2 = DrawPlane(uv);
+	col = mix(col2, col, 1.-col2.a);
+    // Output to screen
+    fragColor = vec4(col);
+}
